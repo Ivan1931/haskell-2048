@@ -18,7 +18,16 @@ type Operation = (Board -> Coord -> Board)
 type Predicate = (Board -> Coord -> Bool)
 
 toString :: Board -> String
-toString _ = undefined
+toString board = iterate "" (0,0)
+  where iterate xs xy@(x,y) = let square = fromJust $ Map.lookup xy board 
+                                  c      = if isNothing square
+                                           then "*"
+                                           else show (fromJust square)
+                                  next   = xs ++ c
+                              in case xy of
+                                (top,top) -> next
+                                (top,_)   -> iterate next (0, y + 1)
+                                (_,_)     -> iterate next (x + 1, y)
 
 fromString :: String -> Board
 fromString str = Map.fromList [((i,j), (getSquare i j)) | i <- [0 .. top], j <- [0 .. top]]
