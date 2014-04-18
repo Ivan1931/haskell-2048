@@ -61,6 +61,13 @@ shiftColumn board = iterateShits board (3,3)
 fullShift :: Board -> Board
 fullShift = shiftColumn . shiftColumn . shiftColumn . shiftColumn
 
+
+canMergeSquare :: Board -> Coord -> Bool
+canMergeSquare board xy@(x,y) = (current == next) && (not $ isNothing next) && (not $ isNothing $ fromJust next)
+    where getSquare coord = Map.lookup coord board
+          current = getSquare xy
+          next = getSquare (x + 1, y)
+
 merge :: Board -> Board
 merge _ = undefined
 
