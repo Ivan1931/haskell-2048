@@ -2,10 +2,15 @@ module TwentyFortyEight where
 
 import qualified Data.Map as Map
 import qualified Data.List as List
-import Control.Applicative
+import qualified Control.Applicative as A
 import Data.Maybe
 
+empty = fromString "****\n\
+                   \****\n\
+                   \****\n\
+                   \****"
 top = 3
+
 two = Just (2 :: Int)
 four = Just (4 :: Int)
 
@@ -25,10 +30,9 @@ toString board = iterate "" (0,0)
                                            else show (fromJust square)
                                   next   = xs ++ c
                               in case xy of
-                                (top,top) -> next
-                                (top,_)   -> iterate next (0, y + 1)
-                                (_,_)     -> iterate next (x + 1, y)
-
+                                (3,3) -> next
+                                (3,_) -> iterate (next ++ "\n") (0, y + 1)
+                                (_,_) -> iterate next (x + 1, y)
 fromString :: String -> Board
 fromString str = Map.fromList [((i,j), (getSquare i j)) | i <- [0 .. top], j <- [0 .. top]]
   where rows = lines str
@@ -95,7 +99,7 @@ mergeSquare board xy = applyToSquare board doMerge canMergeSquare xy
   where doMerge board' xy'@(x,y) = let xy'' = (x + 1, y)
                                        next = fromJust $ Map.lookup xy'' board'
                                        current = fromJust $ Map.lookup xy' board' 
-                                       mergeNext = Map.adjust (\a -> (fmap (+) next) <*> a) xy'' board'
+                                       mergeNext = Map.adjust (\a -> (fmap (+) next) A.<*> a) xy'' board'
                                        blankLast = Map.adjust (\_ -> Nothing) xy' 
                                    in blankLast $ mergeNext
 
@@ -105,5 +109,14 @@ merge board = applyToAll board mergeSquare
 transition :: Board -> Board
 transition board = fullShift $ merge $ fullShift board
 
+rotateCoord :: Coord -> Coord
+rotateCoord (x,y) = rot
+  where toFloat a = fromIntegral a :: Float
+        toInt   a = floor a :: Int
+        rot = let x' = toFloat x - 1.5
+                  y' = toFloat y - 1.5
+              in (toInt ((-y') + 1.5), toInt (x' + 1.5))
+
 rotate :: Board -> Board
-rotate _ = undefined
+rotate board = Map.mapWithKey rotate' empty
+  where rotate' xy _ = fromJust $ Map.lookup (rotateCoord xy) board

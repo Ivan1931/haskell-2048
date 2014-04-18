@@ -2,10 +2,6 @@ import TwentyFortyEight
 import Test.Hspec
 import qualified Data.Map as Map
 
-empty = fromString "****\n\
-                   \****\n\
-                   \****\n\
-                   \****"
 
 start = (0,0)
 end = (3,0)
@@ -27,6 +23,7 @@ mergedTwoInRow = set empty ((1,0), four)
 fullOfTwos = setCoords empty [((i, j), two) | i <- [0 .. top], j <- [0 .. top]]
 twoFourLines = setCoords empty [((i,j), four) | i <- [1, 3], j <- [0 .. top]]
 twoFourLinesAtEnd = setCoords empty [((i,j), four) | i <- [2, 3], j <- [0 .. top]]
+lineAtTop = setCoords empty [((i,0), two) | i <- [0 .. top]]
 
 shifting = do
   describe "Shifting board to the right" $ do
@@ -96,9 +93,29 @@ fullTransition = do
       it "merges a board full of twos to one with two rows of fours at the end" $ do
         transition fullOfTwos `shouldBe` twoFourLinesAtEnd
 
+rotation = do
+    describe "rotation" $ do
+      describe "rotation of single points" $ do
+        it "rotates (0,0) to (3,0)" $ do
+          rotateCoord (0,0) `shouldBe` (3,0)
+        it "when rotated 4 times, returns the same value" $ do
+          (rotateCoord . rotateCoord . rotateCoord . rotateCoord) (0,0) `shouldBe` (0,0)
+        it "rotates (1,2) to (1,1)" $ do
+          rotateCoord (1,2) `shouldBe` (1,1)
+        it "rotates (3,0) to (3,3)" $ do
+          rotateCoord (3,0) `shouldBe` (3,3)
+        it "when rotated twice rotates (3,0) to (0,3)" $ do
+          (rotateCoord . rotateCoord) (3,0) `shouldBe` (0,3)
+      describe "rotation of entire board" $ do
+        it "when rotating an empty board returns an empty board" $ do
+          rotate empty `shouldBe` empty
+        it "squares on the end become squares on the top of the board" $ do
+          rotate lineAtEnd `shouldBe` lineAtTop
+        it "when rotated for times returns the same board" $ do
+          (rotate . rotate . rotate . rotate) twoFourLinesAtEnd `shouldBe` twoFourLinesAtEnd
 
 main = hspec $ do
   shifting
   merging
   fullTransition
-
+  rotation
