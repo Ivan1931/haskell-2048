@@ -114,6 +114,14 @@ rotation = do
         it "when rotated for times returns the same board" $ do
           (rotate . rotate . rotate . rotate) twoFourLinesAtEnd `shouldBe` twoFourLinesAtEnd
 
+brickSpawning = do
+    describe "spawning squares" $ do
+      describe "canPlaceSquare" $ do
+        it "when it a shift or merge can be made, it is possible to place a brick and thus returns true" $ do
+          canPlaceSquare twoRowsAtFront `shouldBe` True
+        it "when move is impossible, ie cannot shift or merge, returns false" $ do
+          canPlaceSquare lineAtEnd `shouldBe` False
+
 main = hspec $ do
   shifting
   merging
