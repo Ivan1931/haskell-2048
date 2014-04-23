@@ -127,3 +127,4 @@ main = hspec $ do
   merging
   fullTransition
   rotation
+  brickSpawning

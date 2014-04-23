@@ -120,3 +120,6 @@ rotateCoord (x,y) = rot
 rotate :: Board -> Board
 rotate board = Map.mapWithKey rotate' empty
   where rotate' xy _ = fromJust $ Map.lookup (rotateCoord xy) board
+
+canPlaceSquare :: Board -> Bool
+canPlaceSquare board = (transition board) /= board
