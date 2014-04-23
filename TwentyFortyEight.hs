@@ -22,6 +22,11 @@ type Board = Map.Map Coord Square
 type Operation = (Board -> Coord -> Board)
 type Predicate = (Board -> Coord -> Bool)
 
+data Move = Up | Down | Left | Right
+          deriving (Eq, Show, Read)
+
+type Strategy = (Board -> Move)
+
 toString :: Board -> String
 toString board = iterate "" (0,0)
   where iterate xs xy@(x,y) = let square = fromJust $ Map.lookup xy board 
@@ -123,3 +128,23 @@ rotate board = Map.mapWithKey rotate' empty
 
 canPlaceSquare :: Board -> Bool
 canPlaceSquare board = (transition board) /= board
+
+isEmpty :: Maybe (Maybe a) -> Bool
+isEmpty = isNothing . fromJust
+
+possibleCoords :: Board -> [Coord]
+possibleCoords board = checkEnd 0
+  where checkEnd idy = let takeIfEmpty = if isEmpty $ Map.lookup (top, idy) board then [(top, idy)] else []
+                       in case idy of 
+                                3 -> takeIfEmpty
+                                _   -> takeIfEmpty ++ checkEnd (idy + 1)
+
+--hehehehehehehehehe
+leftSwipe = transition
+rightSwipe = rotate . rotate . transition . rotate . rotate
+topSwipe = rotate . rotate . rotate . transition . rotate
+bottomSwipe = rotate . transition . rotate . rotate . rotate
+
+countEmptySquares :: Board -> Int
+countEmptySquares board = Map.foldl' count 0 board
+  where count acc square = if isNothing square then acc + 1 else acc

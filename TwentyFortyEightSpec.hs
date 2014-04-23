@@ -121,6 +121,20 @@ brickSpawning = do
           canPlaceSquare twoRowsAtFront `shouldBe` True
         it "when move is impossible, ie cannot shift or merge, returns false" $ do
           canPlaceSquare lineAtEnd `shouldBe` False
+      describe "possibleCoords" $ do
+        it "when there are squares on the end of the board it returns an empty list" $ do
+          possibleCoords lineAtEnd `shouldBe` []
+        it "when it can add squares to the end of the board it returns the last line of coords" $ do
+          possibleCoords empty `shouldBe` [(3,0),(3,1),(3,2),(3,3)]
+
+emptySquaresCounter = do 
+  describe "countEmptySquare" $ do
+    it "when counting empty board it returns 16" $ do
+      countEmptySquares empty `shouldBe` 16
+    it "when counting a full board it returns 0" $ do
+      countEmptySquares fullOfTwos `shouldBe` 0
+    it "when counting a half full board, there are 8" $ do
+      countEmptySquares twoFourLines `shouldBe` 8
 
 main = hspec $ do
   shifting
@@ -128,3 +142,4 @@ main = hspec $ do
   fullTransition
   rotation
   brickSpawning
+  emptySquaresCounter
