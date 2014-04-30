@@ -13,7 +13,6 @@ lineAtSecond   = setCoords empty [((1,j), Just 2) | j <- [0 .. top]]
 twoRowsAtFront = setCoords empty [((i,j), Just (2 * i)) | i <- [0,1], j <- [0 .. top]]
 twoRowsAtSecond = setCoords empty [((i,j), Just (2 * (i - 1))) | i <- [1,2], j <- [0 .. top]] 
 twoRowsAtEnd = setCoords empty [((i,j), Just (2 * (i - 2))) | i <- [2,3], j <- [0 .. top]] 
-atStart = set empty (start, Just 2)
 atEnd   = set empty ((3,0), Just 2)
 atSecondPosition = set empty ((1,0), Just 2)
 twoInRow = set atStart ((1,0), Just 2)
@@ -24,6 +23,8 @@ fullOfTwos = setCoords empty [((i, j), two) | i <- [0 .. top], j <- [0 .. top]]
 twoFourLines = setCoords empty [((i,j), four) | i <- [1, 3], j <- [0 .. top]]
 twoFourLinesAtEnd = setCoords empty [((i,j), four) | i <- [2, 3], j <- [0 .. top]]
 lineAtTop = setCoords empty [((i,0), two) | i <- [0 .. top]]
+atBottom = set empty ((0,3), two)
+atTop = atStart
 
 shifting = do
   describe "Shifting board to the right" $ do
@@ -89,9 +90,25 @@ merging = do
         merge fullOfTwos `shouldBe` twoFourLines
 
 fullTransition = do
-    describe "fullLeftTransision" $ do
-      it "merges a board full of twos to one with two rows of fours at the end" $ do
-        transition fullOfTwos `shouldBe` twoFourLinesAtEnd
+    describe "transitions" $ do
+      describe "right transition. Also transition all others are built from" $ do
+        it "merges a board full of twos to one with two rows of fours at the end" $ do
+          transition fullOfTwos `shouldBe` twoFourLinesAtEnd
+      describe "leftTransision. Everything shifted and merged to the left" $ do
+        it "transisions from right of board to left of board" $ do
+          leftTransition atEnd `shouldBe` atStart
+        it "stays put if already at right of board" $ do
+          leftTransition atStart `shouldBe` atStart 
+      describe "upwards transition" $ do
+        it "only stops when it reaches the top. Aaaahhh yeaahhh" $ do
+          upTransition atBottom `shouldBe` atTop
+        it "does nothing when square is already at the top" $ do
+          upTransition atTop `shouldBe` atTop
+      describe "downward transition" $ do
+        it "transitions from top to bottom succesfully" $ do
+          downTransition atTop `shouldBe` atBottom
+        it "does nothing when already at bottom" $ do
+          downTransition atBottom `shouldBe` atBottom
 
 rotation = do
     describe "rotation" $ do
@@ -121,11 +138,11 @@ brickSpawning = do
           canPlaceSquare twoRowsAtFront `shouldBe` True
         it "when move is impossible, ie cannot shift or merge, returns false" $ do
           canPlaceSquare lineAtEnd `shouldBe` False
-      describe "possibleCoords" $ do
+      describe "possibleSpawnCoords" $ do
         it "when there are squares on the end of the board it returns an empty list" $ do
-          possibleCoords lineAtEnd `shouldBe` []
+          possibleSpawnCoords lineAtEnd `shouldBe` []
         it "when it can add squares to the end of the board it returns the last line of coords" $ do
-          possibleCoords empty `shouldBe` [(3,0),(3,1),(3,2),(3,3)]
+          possibleSpawnCoords empty `shouldBe` [(3,0),(3,1),(3,2),(3,3)]
 
 emptySquaresCounter = do 
   describe "countEmptySquare" $ do
@@ -136,6 +153,27 @@ emptySquaresCounter = do
     it "when counting a half full board, there are 8" $ do
       countEmptySquares twoFourLines `shouldBe` 8
 
+gameRules = do
+    describe "testing rules of game" $ do
+      describe "defeate" $ do
+        it "is false when there is only one block" $ do
+          hasLost atTop `shouldBe` False
+        it "is false when empty" $ do
+          hasLost empty `shouldBe` False
+        it "has not lost when full of only twos" $ do
+          hasLost fullOfTwos `shouldBe` False
+        it "has not lost when there is a line down the right" $ do
+          hasLost twoFourLinesAtEnd `shouldBe` False
+      describe "score" $ do
+        it "0 when there is a single two on the board" $ do
+          score atStart `shouldBe` 0
+        it "4 when there is a single four on the board" $ do
+          score (set empty ((0,0), four)) `shouldBe` 4
+        it "16 when there is an 8 on the board" $ do
+          score (set empty ((0,0), Just 8)) `shouldBe` 16
+        it "32 when there are two lines of 4's on the board" $ do
+          score twoFourLines `shouldBe` 32
+
 main = hspec $ do
   shifting
   merging
@@ -143,3 +181,4 @@ main = hspec $ do
   rotation
   brickSpawning
   emptySquaresCounter
+  gameRules

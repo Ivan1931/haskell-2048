@@ -4,6 +4,9 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import qualified Control.Applicative as A
 import Data.Maybe
+import Control.Monad
+import System.Random
+import Control.Concurrent (threadDelay)
 
 empty = fromString "****\n\
                    \****\n\
@@ -13,6 +16,7 @@ top = 3
 
 two = Just (2 :: Int)
 four = Just (4 :: Int)
+atStart = set empty ((0,0), Just 2)
 
 type X = Int
 type Y = Int
@@ -22,10 +26,10 @@ type Board = Map.Map Coord Square
 type Operation = (Board -> Coord -> Board)
 type Predicate = (Board -> Coord -> Bool)
 
-data Move = Up | Down | Left | Right
+data Move = U | D | L | R
           deriving (Eq, Show, Read)
 
-type Strategy = (Board -> Move)
+type Strategy = (Board -> IO Move)
 
 toString :: Board -> String
 toString board = iterate "" (0,0)
@@ -33,11 +37,12 @@ toString board = iterate "" (0,0)
                                   c      = if isNothing square
                                            then "*"
                                            else show (fromJust square)
-                                  next   = xs ++ c
+                                  next   = xs ++ "\t" ++ c
                               in case xy of
                                 (3,3) -> next
-                                (3,_) -> iterate (next ++ "\n") (0, y + 1)
+                                (3,_) -> iterate (next ++ "\n\n") (0, y + 1)
                                 (_,_) -> iterate next (x + 1, y)
+
 fromString :: String -> Board
 fromString str = Map.fromList [((i,j), (getSquare i j)) | i <- [0 .. top], j <- [0 .. top]]
   where rows = lines str
@@ -132,19 +137,123 @@ canPlaceSquare board = (transition board) /= board
 isEmpty :: Maybe (Maybe a) -> Bool
 isEmpty = isNothing . fromJust
 
-possibleCoords :: Board -> [Coord]
-possibleCoords board = checkEnd 0
+--rotates board to a right orientation from specified other orientation
+rotateToRightFromLeft = rotate . rotate
+rotateToRightFromUp = rotate
+rotateToRightFromDown = rotate . rotate . rotate 
+
+--rotates board to a specified orientation from right orientation
+rotateToDownFromRight = rotate
+rotateToUpFromRight = rotate . rotate .rotate
+rotateToLeftFromRight = rotate . rotate
+
+--hehehehehehehehehe
+leftTransition  = rotateToRightFromLeft . transition . rotateToLeftFromRight
+rightTransition = transition
+upTransition    = rotateToRightFromUp . transition . rotateToUpFromRight
+downTransition  = rotateToRightFromDown . transition . rotateToDownFromRight
+
+countEmptySquares :: Board -> Int
+countEmptySquares board  = Map.foldl' count 0 board
+  where count acc square = if isNothing square then acc + 1 else acc
+
+actionForMove :: Move -> (Board -> Board)
+actionForMove L  = leftTransition
+actionForMove R = rightTransition
+actionForMove U    = upTransition
+actionForMove D  = downTransition
+
+--finds all possible spawn points on the right of the board
+possibleSpawnCoords :: Board -> [Coord]
+possibleSpawnCoords board = checkEnd 0
   where checkEnd idy = let takeIfEmpty = if isEmpty $ Map.lookup (top, idy) board then [(top, idy)] else []
                        in case idy of 
                                 3 -> takeIfEmpty
-                                _   -> takeIfEmpty ++ checkEnd (idy + 1)
+                                _ -> takeIfEmpty ++ checkEnd (idy + 1)
 
---hehehehehehehehehe
-leftSwipe = transition
-rightSwipe = rotate . rotate . transition . rotate . rotate
-topSwipe = rotate . rotate . rotate . transition . rotate
-bottomSwipe = rotate . transition . rotate . rotate . rotate
+spawnsLeft :: Board -> [Coord]
+spawnsLeft  board = map (rotateCoord . rotateCoord ) $ possibleSpawnCoords $ rotateToRightFromLeft board
+spawnsRight :: Board -> [Coord]
+spawnsRight board = possibleSpawnCoords board
+spawnsDown :: Board -> [Coord]
+spawnsDown    board = map rotateCoord $ possibleSpawnCoords $ rotateToRightFromUp board
+spawnsUp :: Board -> [Coord]
+spawnsUp  board = map (rotateCoord . rotateCoord . rotateCoord) $ possibleSpawnCoords $ rotateToRightFromDown board
 
-countEmptySquares :: Board -> Int
-countEmptySquares board = Map.foldl' count 0 board
-  where count acc square = if isNothing square then acc + 1 else acc
+--finds all possible spawn coords on the board
+allPossibleSpawnPoints :: Board -> [Coord]
+allPossibleSpawnPoints board = forLeft ++ forUp ++ forDown ++ forRight
+  where forLeft  = spawnsLeft board
+        forUp    = spawnsUp board
+        forDown  = spawnsDown board
+        forRight = spawnsRight board
+
+hasLost :: Board -> Bool
+hasLost board = allTransitions board == board && allPossibleSpawnPoints board == []
+  where allTransitions = leftTransition . rightTransition . upTransition . downTransition
+
+score :: Board -> Int
+score board = Map.foldl (\acc v -> acc + (squareScore v)) 0 board
+  where squareScore Nothing  = 0
+        squareScore (Just 2) = 0
+        squareScore (Just a) = f 1 $ reverse $ takeWhile (<= a) [2 ^ i | i <- [2..]]
+        f _ [] = 0
+        f c (x: xs) = (c * x) + f (c * 2) xs
+
+randomStrategy :: Board -> IO Move
+randomStrategy _ = do
+    g <- getStdGen
+    let randoms = randomRs (0 :: Int, 3 :: Int) g
+        move = case head $ randoms of
+                  0 -> L
+                  1 -> R
+                  2 -> U
+                  3 -> D
+    return move
+
+randomSpawnPoint :: Board -> Move -> IO Board
+randomSpawnPoint board move = do
+    newStdGen
+    g <- getStdGen
+    let getCoord = case move of
+                         U -> spawnsDown
+                         D -> spawnsUp
+                         R -> spawnsLeft
+                         L -> spawnsRight
+        nextSquare = case randomR (False, True) g of
+                       (True,_) -> (Just 4)
+                       _    -> (Just 2)
+        spawnCoords = getCoord board
+        coordIndex = fst (randomR (0, (length spawnCoords) - 1) g)
+    --putStrLn $ show spawnCoords
+    --putStrLn $ show move
+    return $ case spawnCoords of
+               [] -> board
+               --this appaling line is selecting a random value from the
+               --returned possible coordinates
+               xs -> set board (spawnCoords !! coordIndex, nextSquare)
+
+iterateGame :: Board -> Strategy -> IO (Board, Bool)
+iterateGame board applyStrategy = do 
+    nextMove <- applyStrategy board
+    let applyMove = actionForMove nextMove
+        board'    = applyMove board
+        lost      = hasLost board'
+    board'' <- randomSpawnPoint board' nextMove
+    if board' /= board
+    then return (board'', lost)
+    else return (board', lost)
+    
+
+printingGameDriver :: Board -> Strategy -> IO Board
+printingGameDriver board applyStrategy = do
+    (board', lost) <- iterateGame board applyStrategy
+    putStrLn $ concat $ replicate 4 "\t="
+    putStrLn $ toString board'
+    putStrLn $ concat $ replicate 4 "\t="
+    threadDelay 500000
+    if lost 
+    then return $ board'
+    else printingGameDriver board' applyStrategy
+
+main = printingGameDriver atStart randomStrategy >>= (\a -> putStrLn $ toString a)
