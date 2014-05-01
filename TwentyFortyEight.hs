@@ -225,8 +225,6 @@ randomSpawnPoint board move = do
                        _    -> (Just 2)
         spawnCoords = getCoord board
         coordIndex = fst (randomR (0, (length spawnCoords) - 1) g)
-    --putStrLn $ show spawnCoords
-    --putStrLn $ show move
     return $ case spawnCoords of
                [] -> board
                --this appaling line is selecting a random value from the
@@ -245,15 +243,11 @@ iterateGame board applyStrategy = do
     else return (board', lost)
     
 
-printingGameDriver :: Board -> Strategy -> IO Board
-printingGameDriver board applyStrategy = do
+standardGameDriver :: Board -> Strategy -> IO Board
+standardGameDriver board applyStrategy = do
     (board', lost) <- iterateGame board applyStrategy
-    putStrLn $ concat $ replicate 4 "\t="
-    putStrLn $ toString board'
-    putStrLn $ concat $ replicate 4 "\t="
-    threadDelay 500000
     if lost 
     then return $ board'
-    else printingGameDriver board' applyStrategy
+    else standardGameDriver board' applyStrategy
 
-main = printingGameDriver atStart randomStrategy >>= (\a -> putStrLn $ toString a)
+--main = standardGameDriver atStart randomStrategy >>= (\a -> putStrLn $ toString a)
