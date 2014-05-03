@@ -3,4 +3,4 @@ module Main where
 import TwentyFortyEight
 
 main :: IO ()
-main = standardGameDriver atStart randomStrategy >>= (\a -> putStrLn $ toString a)
+main = standardGameDriver atStart maximiseBlanks >>= (\a -> putStrLn $ toString a)

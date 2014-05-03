@@ -7,6 +7,8 @@ import Data.Maybe
 import Control.Monad
 import System.Random
 import Control.Concurrent (threadDelay)
+import Data.Function
+import GHC.Float
 
 empty = fromString "****\n\
                    \****\n\
@@ -200,6 +202,47 @@ score board = Map.foldl (\acc v -> acc + (squareScore v)) 0 board
         f _ [] = 0
         f c (x: xs) = (c * x) + f (c * 2) xs
 
+possibleMoves :: Board -> [Move]
+possibleMoves board = filter canMove [L, R, U, D]
+  where canMove move = (actionForMove move) board /= board
+
+possibleFutureBoardsForMove :: Board -> Move -> [Board]
+possibleFutureBoardsForMove board move = let board' = (actionForMove move) board
+                                             glueTwoFour coord = [(coord, four), (coord, two)]
+                                             possibleSpawns spawner = concat $ map glueTwoFour (spawner board')
+                                             getFutures spawner = map (set board') (possibleSpawns spawner) -- map a function that gets all future spawn points of a board in a certain direction
+                                         in if board == board' -- the move is impossible, return just the next board as it is the only possible future board with this move
+                                         then [board]
+                                         else case move of
+                                                L -> getFutures spawnsLeft
+                                                R -> getFutures spawnsRight
+                                                D -> getFutures spawnsDown
+                                                U -> getFutures spawnsUp
+
+allPossibleFutureBoards :: Board -> [Board]
+allPossibleFutureBoards board = concat $ map (possibleFutureBoardsForMove board) (possibleMoves board)
+
+maximiseBlanks :: Board -> IO Move
+maximiseBlanks board = do
+    let moves = possibleMoves board
+        averages = map averageNumberEmptySquares moves
+    if averages == []
+    then
+      return L 
+    else
+      return $ fst $ List.maximumBy (\(_,a) (_,b) -> compare a b) (zip moves averages) 
+  where 
+        averageNumberEmptySquares :: Move -> Float
+        averageNumberEmptySquares move = iter 1 ((actionForMove move) board)
+        iter :: Int -> Board -> Float
+        iter 0 board'' = let boards' = allPossibleFutureBoards board''
+                         in  average $ map countEmptySquares boards'
+        iter n board'' = average $ map (iter (n - 1)) (allPossibleFutureBoards board'') 
+
+average :: (Real a, Fractional b) => [a] -> b
+average [] = 20
+average xs = realToFrac (sum xs) / List.genericLength xs
+
 randomStrategy :: Board -> IO Move
 randomStrategy _ = do
     g <- getStdGen
@@ -233,6 +276,8 @@ randomSpawnPoint board move = do
 
 iterateGame :: Board -> Strategy -> IO (Board, Bool)
 iterateGame board applyStrategy = do 
+    putStrLn $ toString board
+    putStrLn "\n"
     nextMove <- applyStrategy board
     let applyMove = actionForMove nextMove
         board'    = applyMove board
@@ -242,12 +287,9 @@ iterateGame board applyStrategy = do
     then return (board'', lost)
     else return (board', lost)
     
-
 standardGameDriver :: Board -> Strategy -> IO Board
 standardGameDriver board applyStrategy = do
     (board', lost) <- iterateGame board applyStrategy
     if lost 
     then return $ board'
     else standardGameDriver board' applyStrategy
-
---main = standardGameDriver atStart randomStrategy >>= (\a -> putStrLn $ toString a)
